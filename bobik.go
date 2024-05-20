@@ -92,22 +92,38 @@ func run() error {
 				_, _ = io.Copy(ptmx, os.Stdin)
 			}()
 
-			pf := NewPromptFinder(ptmx, func(s string) bool {
-				return strings.HasSuffix(s, ":")
+			pf := NewPromptFinder(ptmx, func(s string) (bool, string) {
+				promptPresent := strings.HasSuffix(s, ":")
+				if !promptPresent {
+					return false, ""
+				}
+				s = strings.ToLower(s)
+				switch {
+				case strings.Contains(s, "otp") || strings.Contains(s, "mfa"):
+					return true, "otp"
+				case strings.Contains(s, "password"):
+					return true, "password"
+				}
+				return true, "unknown"
 			})
 
 			go func() {
 				defer pf.Stop()
-				<-pf.Found
-				_, err := fmt.Fprintf(ptmx, "%s\n", data.Password)
-				if err != nil {
-					log.Fatalf("write bobi command to the remote: %v", err)
+				for prompt := range pf.Found {
+					fmt.Printf("{inserted %s}", prompt.Type)
+					command := ""
+					switch prompt.Type {
+					case "password":
+						command = fmt.Sprintf("%s\n", data.Password)
+					case "otp":
+						command = fmt.Sprintf("%s\n", code)
+					}
+					_, err := fmt.Fprintf(ptmx, "%s\n", command)
+					if err != nil {
+						log.Fatalf("write command to the remote: %v", err)
+					}
 				}
-				<-pf.Found
-				_, err = fmt.Fprintf(ptmx, "%s\n", code)
-				if err != nil {
-					log.Fatalf("write bobi command to the remote: %v", err)
-				}
+
 			}()
 			_, _ = io.Copy(os.Stdout, pf)
 		}

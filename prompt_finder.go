@@ -7,23 +7,27 @@ import (
 	"github.com/acarl005/stripansi"
 )
 
+type Prompt struct {
+	Type string
+}
+
 type PromptFinder struct {
 	reader        io.Reader
-	checkFunction func(string) bool
+	checkFunction func(string) (bool, string)
 	builder       *strings.Builder
 	teeReader     io.Reader
-	Found         chan struct{}
+	Found         chan Prompt
 	disabled      chan struct{}
 }
 
-func NewPromptFinder(r io.Reader, check func(string) bool) *PromptFinder {
+func NewPromptFinder(r io.Reader, check func(string) (bool, string)) *PromptFinder {
 	builder := &strings.Builder{}
 	return &PromptFinder{
 		reader:        r,
 		checkFunction: check,
 		builder:       builder,
 		teeReader:     io.TeeReader(r, builder),
-		Found:         make(chan struct{}),
+		Found:         make(chan Prompt),
 		disabled:      make(chan struct{}),
 	}
 }
@@ -42,9 +46,21 @@ func (pf *PromptFinder) Read(p []byte) (int, error) {
 		)
 		accumulated = stripansi.Strip(accumulated)
 		if accumulated != "" {
-			if pf.checkFunction(accumulated) {
-				pf.Found <- struct{}{}
+			promptPresent, promptType := pf.checkFunction(accumulated)
+			if promptPresent {
+				prompt := Prompt{
+					Type: promptType,
+				}
+				pf.Found <- prompt
 				pf.builder.Reset()
+			}
+			// Check whether we already got the shell
+			if strings.HasSuffix(accumulated, "$") || strings.HasSuffix(accumulated, "#") || strings.HasSuffix(accumulated, ">") {
+				// Check if two characters are not the same
+				if accumulated[len(accumulated)-1] != accumulated[len(accumulated)-2] {
+					close(pf.Found)
+					pf.builder.Reset()
+				}
 			}
 		}
 		return n, err
