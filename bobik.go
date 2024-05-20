@@ -32,9 +32,28 @@ func generateCode(secret string, offset int) string {
 	return code
 }
 
+func findAccount() (string, error) {
+	for _, arg := range os.Args[1:] {
+		sp := strings.Split(arg, "{")
+		if len(sp) != 2 {
+			continue
+		}
+		sp = strings.Split(sp[1], "}")
+		if len(sp) != 2 {
+			continue
+		}
+		return sp[0], nil
+
+	}
+	return "", fmt.Errorf("account not found")
+}
+
 func run() error {
 	service := "bobik"
-	account := os.Args[len(os.Args)-1]
+	account, err := findAccount()
+	if err != nil {
+		return err
+	}
 	query := keychain.NewItem()
 	query.SetSecClass(keychain.SecClassGenericPassword)
 	query.SetService(service)
@@ -58,7 +77,13 @@ func run() error {
 				return err
 			}
 
-			cmd := exec.Command(os.Args[1], os.Args[2:]...)
+			// Cleanup the command
+			args := []string{}
+			for _, arg := range os.Args[1:] {
+				args = append(args, strings.ReplaceAll(arg, "{"+account+"}", account))
+			}
+
+			cmd := exec.Command(args[0], args[1:]...)
 
 			// Start the command with a pty.
 			ptmx, err := pty.Start(cmd)

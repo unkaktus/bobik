@@ -21,8 +21,8 @@ Add new item to the macOS Keychain with the "Where" set to "bobik",
 where `password` is your password and `totp_url` is your TOTP URL
 (can be obtained by reading the QR code data).
 
-Once set, login to the node:
+Once set, login to the node embracing your hostname in curly braces:
 
 ```shell
-bobik ssh lunar
+bobik ssh {lunar}
 ```
