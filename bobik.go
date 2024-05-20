@@ -24,7 +24,13 @@ type SecretData struct {
 	TOTPURL  string `json:"totp_url"`
 }
 
-const graceTimeout = 5 * time.Second
+func generateCode(secret string, offset int) string {
+	code, err := totp.GenerateCode(secret, time.Now().Add(30*time.Second*time.Duration(offset)))
+	if err != nil {
+		log.Fatalf("generate OTP code: %v", err)
+	}
+	return code
+}
 
 func run() error {
 	service := "bobik"
@@ -51,11 +57,6 @@ func run() error {
 			if err != nil {
 				return err
 			}
-			code, err := totp.GenerateCode(key.Secret(), time.Now().Add(-graceTimeout))
-			if err != nil {
-				return err
-			}
-			// fmt.Printf("OTP: %s\n", code)
 
 			cmd := exec.Command(os.Args[1], os.Args[2:]...)
 
@@ -108,7 +109,8 @@ func run() error {
 			})
 
 			go func() {
-				defer pf.Stop()
+				otpOffset := 0
+				lastPromptType := ""
 				for prompt := range pf.Found {
 					fmt.Printf("{inserted %s}", prompt.Type)
 					command := ""
@@ -116,8 +118,13 @@ func run() error {
 					case "password":
 						command = fmt.Sprintf("%s\n", data.Password)
 					case "otp":
+						if lastPromptType == "otp" {
+							otpOffset += 1
+						}
+						code := generateCode(key.Secret(), otpOffset)
 						command = fmt.Sprintf("%s\n", code)
 					}
+					lastPromptType = prompt.Type
 					_, err := fmt.Fprintf(ptmx, "%s\n", command)
 					if err != nil {
 						log.Fatalf("write command to the remote: %v", err)

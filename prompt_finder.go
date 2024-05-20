@@ -58,7 +58,7 @@ func (pf *PromptFinder) Read(p []byte) (int, error) {
 			if strings.HasSuffix(accumulated, "$") || strings.HasSuffix(accumulated, "#") || strings.HasSuffix(accumulated, ">") {
 				// Check if two characters are not the same
 				if accumulated[len(accumulated)-1] != accumulated[len(accumulated)-2] {
-					close(pf.Found)
+					pf.Stop()
 					pf.builder.Reset()
 				}
 			}
@@ -69,4 +69,5 @@ func (pf *PromptFinder) Read(p []byte) (int, error) {
 
 func (pf *PromptFinder) Stop() {
 	close(pf.disabled)
+	close(pf.Found)
 }
