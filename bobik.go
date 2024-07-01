@@ -134,7 +134,8 @@ func run() error {
 			})
 
 			go func() {
-				otpOffset := 0
+				otpOffsetNumber := 0
+				otpOffsets := []int{0, 1, -1, 2, -2}
 				lastPromptType := ""
 				for prompt := range pf.Found {
 					fmt.Printf("{inserted %s}", prompt.Type)
@@ -144,9 +145,12 @@ func run() error {
 						command = fmt.Sprintf("%s\n", data.Password)
 					case "otp":
 						if lastPromptType == "otp" {
-							otpOffset += 1
+							otpOffsetNumber += 1
 						}
-						code := generateCode(key.Secret(), otpOffset)
+						if otpOffsetNumber > len(otpOffsets)-1 {
+							log.Fatalf("tried all OTPs")
+						}
+						code := generateCode(key.Secret(), otpOffsets[otpOffsetNumber])
 						command = fmt.Sprintf("%s\n", code)
 					}
 					lastPromptType = prompt.Type
