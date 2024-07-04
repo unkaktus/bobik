@@ -138,6 +138,9 @@ func run() error {
 				otpOffsets := []int{0, 1, -1, 2, -2}
 				lastPromptType := ""
 				for prompt := range pf.Found {
+					if prompt.Type == "unknown" {
+						continue
+					}
 					fmt.Printf("{inserted %s}", prompt.Type)
 					command := ""
 					switch prompt.Type {
